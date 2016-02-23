@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../Backend/etc/menu.xsd">
+    <menu>
+        <add id="Ktpl_Elasticsearch::index_index" title="Elasticsearch" module="Ktpl_Elasticsearch" sortOrder="0" parent="Magento_Backend::system_tools" action="index/index" resource="Ktpl_Elasticsearch::index"/>
+    </menu>
+</config>

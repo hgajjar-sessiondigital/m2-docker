@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="../../../../../lib/internal/Magento/Framework/ObjectManager/etc/config.xsd">
+    <!-- <type name="Magento\Search\Model\Adminhtml\System\Config\Source\Engine">
+        <arguments>
+            <argument name="engines" xsi:type="array">
+                <item name="elasticsearch" xsi:type="string">Elastic Search</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Magento\CatalogSearch\Model\ResourceModel\EngineProvider">
+        <arguments>
+            <argument name="engines" xsi:type="array">
+                <item name="elasticsearch" xsi:type="string">Ktpl\Elasticsearch\Model\Resource\Engine</item>
+            </argument>
+        </arguments>
+    </type> -->
+    <type name="Ktpl\Elasticsearch\Model\Indexer\IndexerHandlerFactory">
+        <arguments>
+            <argument name="configPath" xsi:type="const">Magento\CatalogSearch\Model\ResourceModel\EngineInterface::CONFIG_ENGINE_PATH</argument>
+            <argument name="handlers" xsi:type="array">
+                <item name="elasticsearch" xsi:type="string">Ktpl\Elasticsearch\Model\Indexer\IndexerHandler</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Magento\Catalog\Model\ResourceModel\Product">
+        <plugin name="elasticSearchProduct" type="Ktpl\Elasticsearch\Model\Indexer\Elasticsearch\Plugin\Product"/>
+    </type>
+    <type name="Magento\Catalog\Model\Product\Action">
+        <plugin name="elasticSearchMassAction" type="Ktpl\Elasticsearch\Model\Indexer\Elasticsearch\Plugin\Product\Action"/>
+    </type>
+    <type name="Magento\Store\Model\ResourceModel\Store">
+        <plugin name="elasticSearchIndexerStoreView" type="Ktpl\Elasticsearch\Model\Indexer\Elasticsearch\Plugin\Store\View" />
+    </type>
+    <type name="Magento\Store\Model\ResourceModel\Group">
+        <plugin name="elasticSearchIndexerStoreGroup" type="Ktpl\Elasticsearch\Model\Indexer\Elasticsearch\Plugin\Store\Group"/>
+    </type>
+    <type name="Magento\Catalog\Model\ResourceModel\Attribute">
+        <plugin name="elasticSearchIndexerAttribute" type="Ktpl\Elasticsearch\Model\Indexer\Elasticsearch\Plugin\Attribute"/>
+    </type>
+    <!--<type name="Magento\CatalogSearch\Model\Adminhtml\System\Config\Backend\Engine">
+        <plugin name="addElasticSearchEngine" type="Ktpl\Elasticsearch\Model\Adminhtml\System\Config\Backend\Engine" sortOrder="1"/>
+    </type>-->
+</config>
