@@ -39,6 +39,6 @@ dbdata:
   image: tianon/true
   volumes:
     - /var/lib/mysql
-    
+
 elasticsearch:
   image: elasticsearch
