@@ -38,7 +38,11 @@ db:
 dbdata:
   image: tianon/true
   volumes:
-    - /var/lib/mysql
+    - ./data:/var/lib/mysql
 
 elasticsearch:
   image: elasticsearch
+  ports:
+    - "9200:9200"
+  environment:
+    - VIRTUAL_HOST=m2-elasticsearch.docker

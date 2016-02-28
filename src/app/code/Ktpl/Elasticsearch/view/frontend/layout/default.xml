@@ -1,9 +1,10 @@
 <?xml version="1.0"?>
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
-        <referenceContainer name="header-wrapper">
-            <referenceBlock name="top.search" remove="true"/>
-            <block class="Magento\Framework\View\Element\Template" name="top.elasticsearch" as="topElasticSearch" template="Ktpl_Elasticsearch::form.mini.phtml" after="minicart" />
-        </referenceContainer>
+        <referenceBlock name="top.search">
+            <action method="setTemplate" ifconfig="catalog/elasticsearch/activation">
+                <argument name="name" xsi:type="string">Ktpl_Elasticsearch::form.mini.phtml</argument>
+            </action>
+        </referenceBlock>
     </body>
 </page>

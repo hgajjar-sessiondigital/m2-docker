@@ -356,11 +356,11 @@ class Full
                 $productAttributes[$productData['entity_id']] = $productData['entity_id'];
                 $productChildren = $this->getProductChildIds($productData['entity_id'], $productData['type_id']);
                 $productRelations[$productData['entity_id']] = $productChildren;
-                // if ($productChildren) {
-                //     foreach ($productChildren as $productChildId) {
-                //         $productAttributes[$productChildId] = $productChildId;
-                //     }
-                // }
+                if ($productChildren) {
+                    foreach ($productChildren as $productChildId) {
+                        $productAttributes[$productChildId] = $productChildId;
+                    }
+                }
             }
 
             $productAttributes = $this->getProductAttributes($storeId, $productAttributes, $dynamicFields);

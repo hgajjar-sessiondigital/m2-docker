@@ -217,7 +217,7 @@ class Elasticsearch extends \Magento\Framework\App\Helper\AbstractHelper
 
     public function getClientUrl()
     {
-        return $this->_scopeConfig->getValue(Client::HOST_CONFIG_PATH, ScopeInterface::SCOPE_STORE);
+        return $this->scopeConfig->getValue(Client::HOST_CONFIG_PATH, ScopeInterface::SCOPE_STORE);
     }
 
     /**
