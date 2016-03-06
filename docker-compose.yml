@@ -26,7 +26,7 @@ appdata:
 db:
   image: mariadb:10.0
   ports:
-    - "8001:3306"
+    - "3306:3306"
   volumes_from:
     - dbdata
   environment:
@@ -38,7 +38,7 @@ db:
 dbdata:
   image: tianon/true
   volumes:
-    - ./data:/var/lib/mysql
+    - /var/lib/mysql
 
 elasticsearch:
   image: elasticsearch

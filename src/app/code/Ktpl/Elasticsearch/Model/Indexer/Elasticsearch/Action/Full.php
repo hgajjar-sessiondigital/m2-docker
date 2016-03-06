@@ -364,13 +364,14 @@ class Full
             }
 
             $productAttributes = $this->getProductAttributes($storeId, $productAttributes, $dynamicFields);
+            $searchableAttributes = $this->getSearchableAttributes();
 
             foreach ($products as $i=>$productData) {
                 if (!isset($productAttributes[$productData['entity_id']])) {
                     continue;
                 }
-
                 $productAttr = $productAttributes[$productData['entity_id']];
+
                 if (!isset($productAttr[$visibility->getAttributeCode()])
                     || !in_array($productAttr[$visibility->getAttributeCode()], $allowedVisibility)
                 ) {
@@ -407,6 +408,34 @@ class Full
                 // if ($productChildren !== null && !$hasChildren) {
                 //     continue;
                 // }
+
+                $hasChildren = false;
+                $productChildren = $productRelations[$productData['entity_id']];
+                if ($productChildren) {
+                    foreach ($productChildren as $productChildId) {
+                        if (isset($productAttributes[$productChildId])) {
+                            $productChildAttr = $productAttributes[$productChildId];
+                            if (!isset($productChildAttr[$status->getAttributeCode()])
+                                || !in_array($productChildAttr[$status->getAttributeCode()], $statusIds)
+                            ) {
+                                continue;
+                            }
+
+                            $hasChildren = true;
+
+                            // load all filterable attributes of child as array
+                            foreach ($searchableAttributes as $attr) {
+                                if ($attr->getData('is_filterable_in_search')) {
+                                    if (isset($productChildAttr[$attr->getAttributeCode()])) {
+                                        $productIndex[$productData['entity_id']][$attr->getAttributeCode()][] =
+                                        $productChildAttr[$attr->getAttributeCode()];
+                                    }
+                                }
+                            }
+                            // $productIndex[$productChildId] = $productChildAttr;
+                        }
+                    }
+                }
 
                 $index = $this->prepareProductIndex($productIndex, $productData, $storeId);
                 $index['entity_id'] = $productData['entity_id'];
@@ -620,7 +649,7 @@ class Full
                     []
                 )->joinLeft(
                     ['eav_option_value' => $eavOptionValueTableName],
-                    'eav_option_value.option_id=eav_option.option_id',
+                    'eav_option_value.option_id=eav_option.option_id',// AND eav_option_value.value_id = t_default.value',
                     ['real_value' => 'eav_option_value.value']
                 )->where(
                     't_default.store_id = ?',
