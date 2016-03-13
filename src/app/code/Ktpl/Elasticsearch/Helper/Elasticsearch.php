@@ -239,7 +239,7 @@ class Elasticsearch extends \Magento\Framework\App\Helper\AbstractHelper
         $entity = $this->eavConfig->getEntityType(\Magento\Catalog\Model\Product::ENTITY)->getEntity();
 
         foreach ($attributes as $attribute) {
-            if ($attribute->getIsFilterable() || $attribute->getIsFilterableInSearch()) {
+            if ($attribute->getIsFilterableInSearch()) {
                 $attribute->setEntity($entity);
                 $searchableAttributes[] = $attribute->getData();
             }

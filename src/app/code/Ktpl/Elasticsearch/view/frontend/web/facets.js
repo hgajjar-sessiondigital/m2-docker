@@ -212,6 +212,17 @@ define([
         },
         renderPrice: function(price, currency) {
             return currency + (Math.round(price * 100) / 100)
+        },
+        renderFilter: function(attr_code) {
+            var _this = this;
+            if (_this.attributeNames == null) {
+                _this.attributeNames = [];
+                $.each(this.availableFilters, function(index, item){
+                    _this.attributeNames[item.attribute_code] = item.frontend_label;
+                });
+                _this.attributeNames['category_names'] = 'Category';
+            }
+            return _this.attributeNames[attr_code];
         }
     }
 

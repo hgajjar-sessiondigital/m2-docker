@@ -1,4 +1,5 @@
 <?php
+/** @var \Ktpl\Elasticsearch\Helper\Elasticsearch $elasticSearchHelper */
 $elasticSearchHelper = $this->helper('Ktpl\Elasticsearch\Helper\Elasticsearch');
 $availableFacets = $elasticSearchHelper->getSearchableAttributes();
 
@@ -28,7 +29,7 @@ $availableFacets = $elasticSearchHelper->getSearchableAttributes();
         <div class="filter-options" id="narrow-by-list" data-role="content" role="tablist" data-bind="foreachprop: elasticSearchResults().aggregations">
             <!-- ko if: value.buckets.length -->
             <div data-role="collapsible" class="filter-options-item">
-                <div data-role="title" class="filter-options-title" data-bind="text: key"></div>
+                <div data-role="title" class="filter-options-title" data-bind="text: $parent.service.renderFilter(key)"></div>
                 <div data-role="content" class="filter-options-content">
                     <ol class="items" data-bind="foreach: value.buckets">
                         <li class="item">
