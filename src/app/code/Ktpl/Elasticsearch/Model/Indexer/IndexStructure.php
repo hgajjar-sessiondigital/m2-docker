@@ -247,7 +247,9 @@ class IndexStructure
             $type = 'double';
         } elseif ($attribute->getBackendType() == 'datetime') {
             $type = 'date';
-        } elseif ($attribute->usesSource() || $attribute->getFrontendClass() == 'validate-digits') {
+        } elseif ($attribute->usesSource()) {
+            $type = 'string';
+        } elseif ($attribute->getFrontendClass() == 'validate-digits') {
             $type = 'integer';
         }
 
@@ -261,6 +263,7 @@ class IndexStructure
         foreach ($searchableAttributes as $attribute) {
             switch ($attribute->getBackendType()) {
                 case 'text':
+                case 'int':
                     foreach ($this->storeManager->getStores() as $store) {
                         $languageCode = $this->helper->getLanguageCodeByStore($store);
                         $key = $this->helper->getAttributeFieldName($attribute);
@@ -280,7 +283,7 @@ class IndexStructure
                         $weight = $attribute->getSearchWeight();
                         $properties[$key] = array(
                             'type' => $this->_getAttributeType($attribute),
-                            'boost' => $weight > 0 ? $weight : 1,
+                            'boost' => $weight > 0 ? $weight : 1
                         );
                         if ($attribute->getBackendType() == 'datetime') {
                             $properties[$key]['format'] = $this->_dateFormat;
@@ -294,7 +297,7 @@ class IndexStructure
 
         // Custom attributes indexation
         $properties['visibility'] = array(
-            'type' => 'integer',
+            'type' => 'string',
         );
         $properties['store_id'] = array(
             'type' => 'integer',

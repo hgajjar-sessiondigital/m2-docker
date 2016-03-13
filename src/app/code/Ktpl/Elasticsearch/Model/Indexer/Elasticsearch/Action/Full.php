@@ -28,6 +28,13 @@ class Full
     protected $searchableAttributes;
 
     /**
+     * Multiselect attributes cache
+     *
+     * @var \Magento\Eav\Model\Entity\Attribute[]
+     */
+    protected $multiselectAttributes;
+
+    /**
      * Index values separator
      *
      * @var string
@@ -117,7 +124,7 @@ class Full
     protected $storeManager;
 
     /**
-     * @var \Magento\CatalogSearch\Model\ResourceModel\Engine
+     * @var \Ktpl\Elasticsearch\Model\Resource\Engine
      */
     protected $engine;
 
@@ -204,7 +211,7 @@ class Full
         \Magento\Framework\Search\Request\Config $searchRequestConfig,
         \Magento\Catalog\Model\Product\Attribute\Source\Status $catalogProductStatus,
         \Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory $productAttributeCollectionFactory,
-        \Magento\CatalogSearch\Model\ResourceModel\EngineProvider $engineProvider,
+        \Ktpl\Elasticsearch\Model\Resource\Engine $engine,
         \Ktpl\Elasticsearch\Model\Indexer\IndexerHandlerFactory $indexHandlerFactory,
         \Magento\Framework\Event\ManagerInterface $eventManager,
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
@@ -230,7 +237,7 @@ class Full
         $this->eventManager = $eventManager;
         $this->scopeConfig = $scopeConfig;
         $this->storeManager = $storeManager;
-        $this->engine = $engineProvider->get();
+        $this->engine = $engine;
         $configData = $indexerConfig->getIndexer(Elasticsearch::INDEXER_ID);
         $this->indexHandler = $indexHandlerFactory->create(['data' => $configData]);
         $this->dateTime = $dateTime;
@@ -388,51 +395,33 @@ class Full
 
                 $productIndex = [$productData['entity_id'] => $productAttr];
 
-                // $hasChildren = false;
-                // $productChildren = $productRelations[$productData['entity_id']];
-                // if ($productChildren) {
-                //     foreach ($productChildren as $productChildId) {
-                //         if (isset($productAttributes[$productChildId])) {
-                //             $productChildAttr = $productAttributes[$productChildId];
-                //             if (!isset($productChildAttr[$status->getAttributeCode()])
-                //                 || !in_array($productChildAttr[$status->getAttributeCode()], $statusIds)
-                //             ) {
-                //                 continue;
-                //             }
-                //
-                //             $hasChildren = true;
-                //             $productIndex[$productChildId] = $productChildAttr;
-                //         }
-                //     }
-                // }
-                // if ($productChildren !== null && !$hasChildren) {
-                //     continue;
-                // }
-
-                $hasChildren = false;
                 $productChildren = $productRelations[$productData['entity_id']];
                 if ($productChildren) {
                     foreach ($productChildren as $productChildId) {
                         if (isset($productAttributes[$productChildId])) {
                             $productChildAttr = $productAttributes[$productChildId];
+
                             if (!isset($productChildAttr[$status->getAttributeCode()])
                                 || !in_array($productChildAttr[$status->getAttributeCode()], $statusIds)
                             ) {
                                 continue;
                             }
 
-                            $hasChildren = true;
-
                             // load all filterable attributes of child as array
                             foreach ($searchableAttributes as $attr) {
                                 if ($attr->getData('is_filterable_in_search')) {
-                                    if (isset($productChildAttr[$attr->getAttributeCode()])) {
-                                        $productIndex[$productData['entity_id']][$attr->getAttributeCode()][] =
-                                        $productChildAttr[$attr->getAttributeCode()];
+                                    if (isset($productChildAttr[$attr->getAttributeCode()]))
+                                    {
+                                        if (!isset($productIndex[$productData['entity_id']][$attr->getAttributeCode()]))
+                                        $productIndex[$productData['entity_id']][$attr->getAttributeCode()] = array();
+
+                                        if (!in_array($productChildAttr[$attr->getAttributeCode()], $productIndex[$productData['entity_id']][$attr->getAttributeCode()])) {
+                                            $productIndex[$productData['entity_id']][$attr->getAttributeCode()][] =
+                                            $productChildAttr[$attr->getAttributeCode()];
+                                        }
                                     }
                                 }
                             }
-                            // $productIndex[$productChildId] = $productChildAttr;
                         }
                     }
                 }
@@ -645,11 +634,11 @@ class Full
                     ['attribute_code']
                 )->joinLeft(
                     ['eav_option' => $eavOptionTableName],
-                    't_default.attribute_id=eav_option.attribute_id',
+                    't_default.attribute_id=eav_option.attribute_id AND t_default.value=eav_option.option_id',
                     []
                 )->joinLeft(
                     ['eav_option_value' => $eavOptionValueTableName],
-                    'eav_option_value.option_id=eav_option.option_id',// AND eav_option_value.value_id = t_default.value',
+                    'eav_option_value.option_id=eav_option.option_id',
                     ['real_value' => 'eav_option_value.value']
                 )->where(
                     't_default.store_id = ?',
@@ -667,15 +656,45 @@ class Full
         if ($selects) {
             $select = $this->connection->select()->union($selects, \Magento\Framework\DB\Select::SQL_UNION_ALL);
             $query = $this->connection->query($select);
+            $multiselectAttributes = $this->getMultiSelectAttributes();
             while ($row = $query->fetch()) {
-                if (!empty($row['real_value']))
-                    $result[$row['entity_id']][$row['attribute_code']] = $row['real_value'];
-                else
-                    $result[$row['entity_id']][$row['attribute_code']] = $row['value'];
+                if (isset($multiselectAttributes[$row['attribute_id']])) {
+                    // replace multiselect attribute values
+                    // they are being stored as comma separated values in varchar table
+                    $options = $multiselectAttributes[$row['attribute_id']];
+                    $values = explode(',', $row['value']);
+                    $result[$row['entity_id']][$row['attribute_code']] = array_values(array_intersect_key($options, array_flip($values)));
+                } else {
+                    if (!empty($row['real_value']))
+                        $result[$row['entity_id']][$row['attribute_code']] = $row['real_value'];
+                    else
+                        $result[$row['entity_id']][$row['attribute_code']] = $row['value'];
+                }
             }
         }
 
         return $result;
+    }
+
+    /**
+     * Retried all multiselect attributes
+     */
+    protected function getMultiSelectAttributes()
+    {
+        if (null == $this->multiselectAttributes) {
+            $this->multselectAttributes = [];
+            $allVarcharAttributes = $this->getSearchableAttributes('varchar');
+            foreach ($allVarcharAttributes as $id => $attribute) {
+                if ($attribute->usesSource()) {
+                    $options = [];
+                    foreach ($attribute->getOptions() as $option) {
+                        $options[$option->getValue()] = $option->getLabel();
+                    }
+                    $this->multselectAttributes[$id] = $options;
+                }
+            }
+        }
+        return $this->multselectAttributes;
     }
 
     /**
@@ -784,9 +803,8 @@ class Full
                     case 'price':
                         $value = $attributeValue;
                         break;
-
                     default:
-                        $value = $this->getAttributeValue($attributeCode, $attributeValue, $storeId);
+                        $value = $attributeValue;
                         break;
                 }
 
@@ -859,23 +877,17 @@ class Full
     protected function getAttributeValue($attributeId, $valueId, $storeId)
     {
         $attribute = $this->getSearchableAttribute($attributeId);
-        $value = $this->engine->processAttributeValue($attribute, $valueId);
+        $value = $valueId;
 
         if ($attribute->getIsSearchable()
             && $attribute->usesSource()
             && $this->engine->allowAdvancedIndex()
         ) {
             $attribute->setStoreId($storeId);
-            $valueText = $attribute->getSource()->getIndexOptionText($valueId);
-
-            if (is_array($valueText)) {
-                $value .=  $this->separator . implode($this->separator, $valueText);
-            } else {
-                $value .= $this->separator . $valueText;
-            }
+            $value = (string)$attribute->getSource()->getOptionText($valueId);
         }
 
-        $value = preg_replace('/\\s+/siu', ' ', trim(strip_tags($value)));
+        // $value = preg_replace('/\\s+/siu', ' ', trim(strip_tags($value)));
 
         return $value;
     }

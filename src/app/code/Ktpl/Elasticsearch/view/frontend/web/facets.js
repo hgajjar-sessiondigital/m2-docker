@@ -209,6 +209,9 @@ define([
             }
             if (sorter) service.appliedSorter.push({ [sorter] : { order: order }});
             service.loadResults();
+        },
+        renderPrice: function(price, currency) {
+            return currency + (Math.round(price * 100) / 100)
         }
     }
 
