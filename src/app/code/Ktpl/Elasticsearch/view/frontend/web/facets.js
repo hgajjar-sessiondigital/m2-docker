@@ -32,9 +32,9 @@ define([
         ], function ($) {
             $('[data-role=collapsible]').collapsible();
 
-            $('[data-role=facets-sidebar] .apply-filter').on('click', function(){
-                service.applyFilter($(this).data('filter-name'), $(this).text());
-            });
+            // $('[data-role=facets-sidebar] .apply-filter').on('click', function(){
+            //     service.applyFilter($(this).data('filter-name'), $(this).text());
+            // });
             $('[data-role=facets-sidebar] .filter-current .action.remove').unbind('click');
             $('[data-role=facets-sidebar] .filter-current .action.remove').on('click', function(){
                 service.clearFilter($(this).data('item-index'));
@@ -138,7 +138,11 @@ define([
                 // remove applied aggregations from result
                 $.each(body.aggregations, function(key, item){
                     $.each(_this.appliedFilters(), function(i, filter){
-                        if (key in filter.term) delete body.aggregations[key];
+                        if (filter.term) {
+                            if (key in filter.term) delete body.aggregations[key];
+                        } else if (filter.range) {
+                            if (key in filter.range) delete body.aggregations[key];
+                        }
                     });
                 });
 
@@ -159,7 +163,16 @@ define([
             this.maxPages(Math.ceil(_this.totalRecords() / _this.itemsPerPage()));
         },
         applyFilter: function(filter, value) {
-            this.appliedFilters.push({'term': {[filter]: value}});
+            if (filter == 'price') {
+                value = value.split('-');
+
+                if (value[1]) value = { 'gte': value[0],'lte': value[1]};
+                else value = { 'gte': value[0]};
+
+                this.appliedFilters.push({'range': {[filter]: value}});
+            } else {
+                this.appliedFilters.push({'term': {[filter]: value}});
+            }
             this.loadResults();
         },
         clearFilter: function(filterIndex) {
@@ -210,7 +223,7 @@ define([
             if (sorter) service.appliedSorter.push({ [sorter] : { order: order }});
             service.loadResults();
         },
-        renderPrice: function(price, currency) {
+        renderPrice: function(price, currency='') {
             return currency + (Math.round(price * 100) / 100)
         },
         renderFilter: function(attr_code) {
@@ -223,6 +236,114 @@ define([
                 _this.attributeNames['category_names'] = 'Category';
             }
             return _this.attributeNames[attr_code];
+        },
+        makePriceRange: function(terms) {
+            var max = 0, min = 0;
+            var range = {};
+            $.each(terms, function(k,v) {
+                if (v.key > max) max = v.key;
+
+                if (min == 0) { min = v.key; }
+                else {
+                    if (v.key < min) min = v.key;
+                }
+            });
+
+            var range = service.getPriceRange(max, min, terms);
+
+            var dbRanges = service.getCounts(range, min, max, terms);
+            var data = [];
+
+            if (dbRanges) {
+                var lastIndex = Object.keys(dbRanges);
+                lastIndex = lastIndex[lastIndex.length - 1];
+
+                $.each(dbRanges, function(index,count){
+
+                    var fromPrice = (index == 1) ? '' : ((index - 1) * range);
+                    var toPrice = (index == lastIndex) ? '' : (index * range);
+
+                    data.push({
+                        'label' : service.renderRangeLabel(fromPrice, toPrice),
+                        'value' : fromPrice + '-' + toPrice,
+                        'count' : count
+                    });
+                });
+            }
+
+            return data;
+        },
+        renderRangeLabel: function(fromPrice, toPrice) {
+            var formattedFromPrice = service.renderPrice(fromPrice);
+            if (toPrice == '' || !toPrice) {
+                return formattedFromPrice + ' and above';
+            } else if (fromPrice == toPrice) {
+                return formattedFromPrice;
+            } else {
+                if (fromPrice != toPrice) {
+                    toPrice -= .01;
+                }
+                return formattedFromPrice + ' - ' + service.renderPrice(toPrice);
+            }
+        },
+        getPriceRange: function(maxPrice, minPrice, terms) {
+            var index = 1, MIN_RANGE_POWER = 10;
+            var range;
+            do {
+                range = Math.pow(10, (Math.floor(maxPrice).toString().length - index));
+                var items = service.getRangeItemCounts(range, minPrice, maxPrice, terms);
+                index++;
+            }
+            while(range > MIN_RANGE_POWER && Object.keys(items).length < 2);
+
+            return range;
+        },
+        getRangeItemCounts: function(range, minPrice, maxPrice, terms) {
+            var items = service.getCounts(range, minPrice, maxPrice, terms);
+            return items;
+        },
+        getCounts: function(range, minPrice, maxPrice, terms) {
+            var items = {};
+
+            var i = 1;
+
+            var ranges = [], temp = [];
+            $.each(terms, function(k,v){
+                var priceExpression = Math.round(v.key * 1, 2);
+                var rangeExpression = Math.floor(priceExpression / range) + 1;
+
+                var lower = (rangeExpression * range) - range;
+                var higher = (rangeExpression * range);
+
+                if (temp.indexOf(rangeExpression) == -1) {
+                    ranges.push({
+                        lower: lower,
+                        higher: higher - .01,
+                        rangeExpression: rangeExpression
+                    });
+                }
+                temp.push(rangeExpression);
+            });
+
+            $.each(ranges, function(i,range){
+                $.each(terms, function(k,v){
+
+                    if (v.key >= range.lower &&
+                        v.key <= range.higher ) {
+
+                        if (items[range.rangeExpression]) {
+                            items[range.rangeExpression] = items[range.rangeExpression] + v.doc_count;
+                        } else {
+                            items[range.rangeExpression] = v.doc_count;
+                        }
+                    }
+
+                    i++;
+                });
+            });
+
+
+            return items;
         }
     }
 
