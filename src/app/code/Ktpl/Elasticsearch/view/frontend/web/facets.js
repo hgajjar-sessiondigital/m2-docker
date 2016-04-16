@@ -4,7 +4,9 @@ define([
     'ko',
     'Ktpl_Elasticsearch/facets',
     'mage/collapsible',
-    'mage/loader'
+    'mage/loader',
+    'jquery/ui',
+    'swatchRenderer'
 ], function (Component,$,ko,collapsible,loader) {
     'use strict';
 
@@ -27,18 +29,14 @@ define([
     };
 
     function initSidebar() {
-        require([
-            'jquery'
-        ], function ($) {
-            $('[data-role=collapsible]').collapsible();
+        $('[data-role=collapsible]').collapsible();
 
-            // $('[data-role=facets-sidebar] .apply-filter').on('click', function(){
-            //     service.applyFilter($(this).data('filter-name'), $(this).text());
-            // });
-            $('[data-role=facets-sidebar] .filter-current .action.remove').unbind('click');
-            $('[data-role=facets-sidebar] .filter-current .action.remove').on('click', function(){
-                service.clearFilter($(this).data('item-index'));
-            });
+        // $('[data-role=facets-sidebar] .apply-filter').on('click', function(){
+        //     service.applyFilter($(this).data('filter-name'), $(this).text());
+        // });
+        $('[data-role=facets-sidebar] .filter-current .action.remove').unbind('click');
+        $('[data-role=facets-sidebar] .filter-current .action.remove').on('click', function(){
+            service.clearFilter($(this).data('item-index'));
         });
     }
 
@@ -133,7 +131,7 @@ define([
                     sort: this.appliedSorter()
                 }
             });
-            this.request.then(function (body) {console.log(body);
+            this.request.then(function (body) {
                 var _this = this;
                 // remove applied aggregations from result
                 $.each(body.aggregations, function(key, item){
@@ -155,6 +153,7 @@ define([
                 this.setPaginationVariables();
 
                 initSidebar();
+                this.bindSwatches();
                 $('#maincontent').loader('hide');
             }.bind(this));
         },
@@ -355,6 +354,23 @@ define([
 
 
             return items;
+        },
+        bindSwatches: function() {
+            $.each(this.data().hits.hits, function(i, item) {
+                if (typeof item._source.magento_product_type != 'undefined' &&
+                    item._source.magento_product_type == 'configurable') {
+
+                    $('.swatch-opt-'+item._source.entity_id).SwatchRenderer({
+                        selectorProduct: '.product-item-details',
+                        onlySwatches: true,
+                        enableControlLabel: false,
+                        numberToShow: item._source.numberToShow,
+                        jsonConfig: JSON.parse(item._source.jsonConfig),
+                        jsonSwatchConfig: JSON.parse(item._source.jsonSwatchConfig),
+                        mediaCallback: item._source.mediaCallback
+                    });
+                }
+            });
         }
     }
 

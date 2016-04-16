@@ -321,6 +321,29 @@ class IndexStructure
         $properties['name_suggest'] = array(
             'type' => 'completion'
         );
+        $properties['magento_product_type'] = array(
+            'type' => 'string',
+            'index' => 'not_analyzed'
+        );
+
+        // configurable product swatch fields mapping
+        $properties['numberToShow'] = array(
+            'type' => 'string',
+            'index' => 'not_analyzed'
+        );
+        $properties['jsonConfig'] = array(
+            'type' => 'string',
+            'index' => 'not_analyzed'
+        );
+        $properties['jsonSwatchConfig'] = array(
+            'type' => 'string',
+            'index' => 'not_analyzed'
+        );
+        $properties['mediaCallback'] = array(
+            'type' => 'string',
+            'index' => 'not_analyzed'
+        );
+
 
         return $properties;
     }

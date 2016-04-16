@@ -178,7 +178,15 @@ class Full
      */
     protected $priceCurrency;
 
+    /**
+     * @var \Magento\Catalog\Helper\Product
+     */
     protected $catalogHelper;
+
+    /**
+     * @var \Magento\Swatches\Block\Product\Renderer\Configurable
+     */
+    protected $swatchesBlock;
 
     /**
      * @param ResourceConnection $resource
@@ -200,6 +208,7 @@ class Full
      * @param \Magento\CatalogSearch\Model\ResourceModel\Fulltext $fulltextResource
      * @param \Magento\Framework\Search\Request\DimensionFactory $dimensionFactory
      * @param \Magento\Framework\Indexer\ConfigInterface $indexerConfig
+     * @param \Magento\Swatches\Block\Product\Renderer\Configurable $swatchesBlock
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
@@ -223,7 +232,8 @@ class Full
         \Magento\Framework\Search\Request\DimensionFactory $dimensionFactory,
         \Magento\Framework\Indexer\ConfigInterface $indexerConfig,
         PriceCurrencyInterface $priceCurrency,
-        \Magento\Catalog\Helper\Product $catalogHelper
+        \Magento\Catalog\Helper\Product $catalogHelper,
+        \Magento\Swatches\Block\Product\Renderer\Configurable $swatchesBlock
     ) {
         $this->resource = $resource;
         $this->connection = $resource->getConnection();
@@ -247,6 +257,7 @@ class Full
         $this->dimensionFactory = $dimensionFactory;
         $this->priceCurrency = $priceCurrency;
         $this->catalogHelper = $catalogHelper;
+        $this->swatchesBlock = $swatchesBlock;
     }
 
     /**
@@ -384,6 +395,7 @@ class Full
                 ) {
                     continue;
                 }
+
                 if (!isset($productAttr[$status->getAttributeCode()])
                     || !in_array($productAttr[$status->getAttributeCode()], $statusIds)
                 ) {
@@ -409,7 +421,8 @@ class Full
 
                             // load all filterable attributes of child as array
                             foreach ($searchableAttributes as $attr) {
-                                if ($attr->getData('is_filterable_in_search')) {
+                                // price should be taken from parent product only
+                                if ($attr->getData('is_filterable_in_search') && $attr->getAttributeCode() != 'price') {
                                     if (isset($productChildAttr[$attr->getAttributeCode()]))
                                     {
                                         if (!isset($productIndex[$productData['entity_id']][$attr->getAttributeCode()]))
@@ -816,9 +829,11 @@ class Full
 
         // add special attributes
         $product = $this->productRepository->getById($productData['entity_id']);
-        $url = $product->getUrlModel()->getUrl($product, array('_escape' => true));
+
         // url
+        $url = $product->getUrlModel()->getUrl($product, array('_escape' => true));
         $index['url'] = $url;
+
         // images
         $image = $this->catalogHelper->getImageUrl($product);
         if ($image) {
@@ -836,7 +851,6 @@ class Full
         foreach ($product->getCategoryCollection()->addAttributeToSelect('name')->getItems() as $cat) {
             $catNames[] = $cat['name'];
         }
-        // $index['category_names'] = implode(' ',$catNames);
         $index['category_names'] = $catNames;
 
         // currency
@@ -847,6 +861,21 @@ class Full
         // variants
         if (isset($indexData[$productData['entity_id']]['variants']))
         $index['variants'] = $indexData[$productData['entity_id']]['variants'];
+
+        // product type
+        $index['magento_product_type'] = $product->getTypeId();
+
+        // additional fields for configurable products
+        if ($product->getTypeId() == 'configurable') {
+            $this->swatchesBlock->setProduct($product);
+            $index['numberToShow'] = $this->swatchesBlock->getNumberSwatchesPerProduct();
+            $index['jsonConfig'] = $this->swatchesBlock->getJsonConfig();
+            $index['jsonSwatchConfig'] = $this->swatchesBlock->getJsonSwatchConfig();
+            $index['mediaCallback'] = $this->swatchesBlock->getMediaCallback();
+            // clean allow products in order to fetch current product's options again
+            // instead of loading from cache
+            $this->swatchesBlock->unsAllowProducts();
+        }
 
         unset($product);
 
