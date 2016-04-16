@@ -133,7 +133,7 @@ define([
                     sort: this.appliedSorter()
                 }
             });
-            this.request.then(function (body) {
+            this.request.then(function (body) {console.log(body);
                 var _this = this;
                 // remove applied aggregations from result
                 $.each(body.aggregations, function(key, item){
@@ -173,6 +173,7 @@ define([
             } else {
                 this.appliedFilters.push({'term': {[filter]: value}});
             }
+            this.resetPagination();
             this.loadResults();
         },
         clearFilter: function(filterIndex) {
@@ -200,9 +201,13 @@ define([
             service.loadResults();
         },
         onPageSizeChange: function() {
-            service.currentPage(1);
+            service.resetPagination();
             service.setPaginationVariables();
             service.loadResults();
+        },
+        resetPagination: function() {
+            service.currentPage(1);
+            service.from(0);
         },
         applySort: function() {
             var sorter = service.availableSorters.selectedOption().value;
