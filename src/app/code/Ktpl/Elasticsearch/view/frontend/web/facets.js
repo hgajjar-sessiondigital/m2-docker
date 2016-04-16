@@ -169,9 +169,11 @@ define([
                 if (value[1]) value = { 'gte': value[0],'lte': value[1]};
                 else value = { 'gte': value[0]};
 
-                this.appliedFilters.push({'range': {[filter]: value}});
+                var obj = {}; obj[filter] = value;
+                this.appliedFilters.push({'range': obj});
             } else {
-                this.appliedFilters.push({'term': {[filter]: value}});
+                var obj = {}; obj[filter] = value;
+                this.appliedFilters.push({'term': obj});
             }
             this.resetPagination();
             this.loadResults();
@@ -225,10 +227,14 @@ define([
                 default:
                     sorter = null;
             }
-            if (sorter) service.appliedSorter.push({ [sorter] : { order: order }});
+            var obj = {};
+            obj[sorter] = { order: order };
+            if (sorter) service.appliedSorter.push(obj);
             service.loadResults();
         },
-        renderPrice: function(price, currency='') {
+        renderPrice: function(price, currency) {
+            if (typeof  currency == 'undefined') currency = '';
+
             return currency + (Math.round(price * 100) / 100)
         },
         renderFilter: function(attr_code) {
