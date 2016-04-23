@@ -34,37 +34,54 @@ $availableFacets = $elasticSearchHelper->getSearchableAttributes();
                     </a>
                 </li>
                 <!-- /ko -->
+                <!-- ko if: $data.nested && $data.nested.filter.term -->
+                <li class="item" data-bind="foreachprop: nested.filter.term">
+                    <span class="filter-label" data-bind="text: $parent.nested.path"></span>
+                    <span class="filter-value" data-bind="text: $parent.realValue"></span>
+                    <a class="action remove" href="javascript:void(0)"
+                       data-bind="attr : { 'data-item-index': $parentContext.$index, title: 'Remove '+value }">
+                        <span><?php echo __('Remove This Item')?></span>
+                    </a>
+                </li>
+                <!-- /ko -->
             </ol>
         </div>
         <!-- /ko -->
         <!-- ko if: (elasticSearchResults().aggregations) -->
         <div class="filter-options" id="narrow-by-list" data-role="content" role="tablist" data-bind="foreachprop: elasticSearchResults().aggregations">
+            <!-- ko if: key == 'price' -->
             <!-- ko if: value.buckets.length -->
             <div data-role="collapsible" class="filter-options-item">
-                <div data-role="title" class="filter-options-title" data-bind="text: $parent.service.renderFilter(key)"></div>
+                <div data-role="title" class="filter-options-title" data-bind="text: $parent.service.renderFilterName(key)"></div>
                 <div data-role="content" class="filter-options-content">
-                    <!-- ko if: key == 'price' -->
                     <ol class="items" data-bind="foreach: $parent.service.makePriceRange(value.buckets)">
                         <li class="item">
                             <a href="javascript:void(0)"
-                            data-bind="text: label, click: function() { $parents[1].service.applyFilter($parent.key, value) }"
-                            class="apply-filter"></a>
+                               data-bind="text: label, click: function() { $parents[1].service.applyFilter($parent.key, value) }"
+                               class="apply-filter"></a>
                             <span class="count" data-bind="text: count"><span class="filter-count-label">items</span></span>
                         </li>
                     </ol>
-                    <!-- /ko -->
-                    <!-- ko ifnot: key == 'price' -->
-                    <ol class="items" data-bind="foreach: value.buckets">
+                </div>
+            </div>
+            <!-- /ko -->
+            <!-- /ko -->
+            <!-- ko ifnot: key == 'price' -->
+            <!-- ko if: value.filter.buckets.length -->
+            <div data-role="collapsible" class="filter-options-item">
+                <div data-role="title" class="filter-options-title" data-bind="text: $parent.service.renderFilterName(key)"></div>
+                <div data-role="content" class="filter-options-content">
+                    <ol class="items" data-bind="foreach: value.filter.buckets">
                         <li class="item">
                             <a href="javascript:void(0)"
-                            data-bind="text: key, click: function() { $parents[1].service.applyFilter($parent.key, key) }"
+                            data-bind="text: $parents[1].service.renderFilterValue(key), click: function() { $parents[1].service.applyFilter($parent.key, key) }"
                             class="apply-filter"></a>
                             <span class="count" data-bind="text: doc_count"><span class="filter-count-label">items</span></span>
                         </li>
                     </ol>
-                    <!-- /ko -->
                 </div>
             </div>
+            <!-- /ko -->
             <!-- /ko -->
         </div>
         <!-- /ko -->

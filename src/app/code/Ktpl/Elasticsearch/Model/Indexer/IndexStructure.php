@@ -268,11 +268,32 @@ class IndexStructure
                         $languageCode = $this->helper->getLanguageCodeByStore($store);
                         $key = $this->helper->getAttributeFieldName($attribute);
                         $weight = $attribute->getSearchWeight();
-                        $properties[$key] = array(
-                            'type' => 'string',
-                            'boost' => $weight > 0 ? $weight : 1,
-                            'analyzer' => 'analyzer_' . $languageCode,
-                        );
+
+                        if ($attribute->getData('is_filterable_in_search') && $attribute->getAttributeCode() != 'price'){
+                            $properties[$key] = array(
+                                'type' => 'nested',
+                                'properties' => array(
+                                    'id' => array('type' => 'string', 'index' => 'not_analyzed'),
+                                    'label' => array(
+                                        'type' => 'string',
+                                        'boost' => $weight > 0 ? $weight : 1,
+                                        'analyzer' => 'analyzer_' . $languageCode,
+                                        'fields' => array(
+                                            'raw' => array(
+                                                'type' => 'string',
+                                                'index' => 'not_analyzed'
+                                            )
+                                        )
+                                    )
+                                )
+                            );
+                        } else {
+                            $properties[$key] = array(
+                                'type' => 'string',
+                                'boost' => $weight > 0 ? $weight : 1,
+                                'analyzer' => 'analyzer_' . $languageCode,
+                            );
+                        }
                     }
                 case 'static':
                 case 'varchar':
@@ -281,10 +302,24 @@ class IndexStructure
                     $key = $this->helper->getAttributeFieldName($attribute);
                     if ($this->helper->_isAttributeIndexable($attribute) && !isset($properties[$key])) {
                         $weight = $attribute->getSearchWeight();
-                        $properties[$key] = array(
-                            'type' => $this->_getAttributeType($attribute),
-                            'boost' => $weight > 0 ? $weight : 1
-                        );
+
+                        if ($attribute->getData('is_filterable_in_search') && $attribute->getAttributeCode() != 'price'){
+                            $properties[$key] = array(
+                                'type' => 'nested',
+                                'properties' => array(
+                                    'id' => array('type' => 'string'),
+                                    'label' => array(
+                                        'type' => $this->_getAttributeType($attribute),
+                                        'boost' => $weight > 0 ? $weight : 1
+                                    )
+                                )
+                            );
+                        } else {
+                            $properties[$key] = array(
+                                'type' => $this->_getAttributeType($attribute),
+                                'boost' => $weight > 0 ? $weight : 1
+                            );
+                        }
                         if ($attribute->getBackendType() == 'datetime') {
                             $properties[$key]['format'] = $this->_dateFormat;
                         }
@@ -310,18 +345,13 @@ class IndexStructure
             'boost' => 1,
             'analyzer' => 'analyzer_en',
         );
-        $properties['category_names'] = array(
-            'type' => 'string',
-            // 'index_name' => 'category',
-            'analyzer' => 'keyword',
-        );
         $properties['url'] = array(
             'type' => 'string',
         );
         $properties['name_suggest'] = array(
             'type' => 'completion'
         );
-        $properties['magento_product_type'] = array(
+        $properties['numberToShow'] = array(
             'type' => 'string',
             'index' => 'not_analyzed'
         );
@@ -344,6 +374,23 @@ class IndexStructure
             'index' => 'not_analyzed'
         );
 
+        // category filter mapping
+        $properties['category_names'] = array(
+            'type' => 'nested',
+            'properties' => array(
+                'id' => array('type' => 'string', 'index' => 'not_analyzed'),
+                'label' => array(
+                    'type' => 'string',
+                    'analyzer' => 'analyzer_en',
+                    'fields' => array(
+                        'raw' => array(
+                            'type' => 'string',
+                            'index' => 'not_analyzed'
+                        )
+                    )
+                )
+            )
+        );
 
         return $properties;
     }

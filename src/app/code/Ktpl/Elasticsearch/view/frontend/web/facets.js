@@ -95,17 +95,32 @@ define([
         },
         loadResults: function() {
             $('#maincontent').loader('show');
+            var concat = "doc['category_names.id'].value + '::' + doc['category_names.label.raw'].value";
             var aggregations = {
                 category_names : {
-                    terms : {
-                        field : 'category_names',
-                        // exclude: ['Default Category']
+                    nested: { path: 'category_names' },
+                    aggs: {
+                        'filter': {
+                            terms: {
+                                script: concat
+                            }
+                        }
                     }
                 }
             };
             $.each(this.availableFilters, function(index, item){
-                aggregations[item.attribute_code] = {
-                    terms : { field : item.attribute_code }
+                if (item.attribute_code == 'price') {
+                    aggregations[item.attribute_code] = {
+                        terms: {field: item.attribute_code}
+                    }
+                } else {
+                    var obj = {};
+                    var concat = "doc['"+ item.attribute_code + ".id'].value + '::' + doc['" + item.attribute_code + ".label.raw'].value";
+                    obj['filter'] = { terms: { script: concat } };
+                    aggregations[item.attribute_code] = {
+                        nested: { path: item.attribute_code },
+                        aggs: obj
+                    }
                 }
             });
             if (this.request) this.request.abort();
@@ -122,7 +137,7 @@ define([
                                     }
                                 }
                             },
-                            filter : {bool:{must:this.appliedFilters()}}
+                            filter : {bool:{must:service.getClearedAppliedFiltersForSearch()}}
                         }
                     },
                     size: this.itemsPerPage(),
@@ -140,6 +155,8 @@ define([
                             if (key in filter.term) delete body.aggregations[key];
                         } else if (filter.range) {
                             if (key in filter.range) delete body.aggregations[key];
+                        } else if (filter.nested && filter.nested.filter.term) {
+                            if (key+'.id' in filter.nested.filter.term) delete body.aggregations[key];
                         }
                     });
                 });
@@ -163,26 +180,75 @@ define([
         },
         applyFilter: function(filter, value) {
             if (filter == 'price') {
+                // add applied filter in URL
+                this.addFilterToURL(filter, value);
+
                 value = value.split('-');
 
-                if (value[1]) value = { 'gte': value[0],'lte': value[1]};
+                if (value[1]) value = { 'gte': (value[0] != "")?value[0]:0,'lte': value[1]};
                 else value = { 'gte': value[0]};
 
                 var obj = {}; obj[filter] = value;
                 this.appliedFilters.push({'range': obj});
             } else {
-                var obj = {}; obj[filter] = value;
-                this.appliedFilters.push({'term': obj});
+                var obj = {}; obj[filter + '.id'] = this.getKeyFromFilterValue(value);
+                this.appliedFilters.push({
+                    nested: {
+                        path: filter,
+                        filter: {
+                            term: obj
+                        }
+                    },
+                    realValue: service.renderFilterValue(value)
+                });
+                // add applied filter in URL
+                this.addFilterToURL(filter, this.getKeyFromFilterValue(value));
             }
+
             this.resetPagination();
             this.loadResults();
         },
+        addFilterToURL: function(key, value) {
+            var params = this.getUrlVars();
+            params[key] = value;
+            window.history.pushState("", "", window.location.pathname + '?' + $.param(params));
+        },
+        removeFilterFromURL: function(key) {
+            if (key.nested) key = key.nested.path;
+            else if (key.range) key = Object.keys(key.range)[0];
+            else if (key.term) key = Object.keys(key.term)[0];
+
+            var params = this.getUrlVars();
+            delete params[key];console.log(key);
+            window.history.pushState("", "", window.location.pathname + '?' + $.param(params));
+        },
+        getUrlVars: function () {
+            // get current params
+            var vars = {}, hash;
+            var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+            for(var i = 0; i < hashes.length; i++)
+            {
+                hash = hashes[i].split('=');
+                vars[hash[0]] = hash[1];
+            }
+            return vars;
+        },
         clearFilter: function(filterIndex) {
+            this.removeFilterFromURL(this.appliedFilters()[filterIndex]);
             this.appliedFilters.splice(filterIndex);
             this.loadResults();
         },
         getAppliedFilters: function() {
             return this.appliedFilters;
+        },
+        getClearedAppliedFiltersForSearch: function() {
+            var filters = this.appliedFilters();
+            var clearedFilters = [];
+            $.each(filters, function(k,v){
+                if (v.realValue) delete v.realValue;
+                clearedFilters.push(v);
+            });
+            return clearedFilters;
         },
         moveNext: function() {
             service.changePage(service.currentPage() + 1)
@@ -236,16 +302,24 @@ define([
 
             return currency + (Math.round(price * 100) / 100)
         },
-        renderFilter: function(attr_code) {
+        renderFilterName: function(attr_code) {
             var _this = this;
             if (_this.attributeNames == null) {
                 _this.attributeNames = [];
+                _this.attributeNames['category_names'] = 'Category';
                 $.each(this.availableFilters, function(index, item){
                     _this.attributeNames[item.attribute_code] = item.frontend_label;
                 });
-                _this.attributeNames['category_names'] = 'Category';
             }
             return _this.attributeNames[attr_code];
+        },
+        renderFilterValue: function (value) {
+            value = value.split('::');
+            return (value.constructor === Array)? value[1]:value;
+        },
+        getKeyFromFilterValue: function (value) {
+            value = value.split('::');
+            return (value.constructor === Array)? value[0]:value;
         },
         makePriceRange: function(terms) {
             var max = 0, min = 0;

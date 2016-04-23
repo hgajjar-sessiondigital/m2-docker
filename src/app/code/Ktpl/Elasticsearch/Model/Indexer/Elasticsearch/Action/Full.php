@@ -429,8 +429,7 @@ class Full
                                         $productIndex[$productData['entity_id']][$attr->getAttributeCode()] = array();
 
                                         if (!in_array($productChildAttr[$attr->getAttributeCode()], $productIndex[$productData['entity_id']][$attr->getAttributeCode()])) {
-                                            $productIndex[$productData['entity_id']][$attr->getAttributeCode()][] =
-                                            $productChildAttr[$attr->getAttributeCode()];
+                                            $productIndex[$productData['entity_id']][$attr->getAttributeCode()][] = $productChildAttr[$attr->getAttributeCode()];
                                         }
                                     }
                                 }
@@ -670,18 +669,35 @@ class Full
             $select = $this->connection->select()->union($selects, \Magento\Framework\DB\Select::SQL_UNION_ALL);
             $query = $this->connection->query($select);
             $multiselectAttributes = $this->getMultiSelectAttributes();
+            $filterableInSearchAttributes = $this->getFilterableInSearchAttributes();
             while ($row = $query->fetch()) {
                 if (isset($multiselectAttributes[$row['attribute_id']])) {
-                    // replace multiselect attribute values
+                    // replace multiselect attribute values with array
                     // they are being stored as comma separated values in varchar table
                     $options = $multiselectAttributes[$row['attribute_id']];
                     $values = explode(',', $row['value']);
-                    $result[$row['entity_id']][$row['attribute_code']] = array_values(array_intersect_key($options, array_flip($values)));
+
+                    if (isset($filterableInSearchAttributes[$row['attribute_id']])) {
+                        $valueObjectsArray = array();
+                        foreach(array_values(array_intersect_key($options, array_flip($values))) as $id=>$label) {
+                            $valueObjectsArray[] = array(
+                                'id' => $id,
+                                'label' => $label
+                            );
+                        }
+                        $result[$row['entity_id']][$row['attribute_code']] = $valueObjectsArray;
+                    } else {
+                        $result[$row['entity_id']][$row['attribute_code']] = array_values(array_intersect_key($options, array_flip($values)));
+                    }
+                } elseif (isset($filterableInSearchAttributes[$row['attribute_id']]) && $row['attribute_code'] != 'price') {
+                    if ($row['value'] != null) {
+                        $result[$row['entity_id']][$row['attribute_code']][] = array(
+                            'id' => $row['value'],
+                            'label' => (!empty($row['real_value'])) ? $row['real_value'] : $row['value']
+                        );
+                    }
                 } else {
-                    if (!empty($row['real_value']))
-                        $result[$row['entity_id']][$row['attribute_code']] = $row['real_value'];
-                    else
-                        $result[$row['entity_id']][$row['attribute_code']] = $row['value'];
+                    $result[$row['entity_id']][$row['attribute_code']] = (!empty($row['real_value']))? $row['real_value']: $row['value'];
                 }
             }
         }
@@ -708,6 +724,27 @@ class Full
             }
         }
         return $this->multselectAttributes;
+    }
+
+    /**
+     * Retried all filterable in search attributes
+     */
+    protected function getFilterableInSearchAttributes()
+    {
+        if (null == $this->multiselectAttributes) {
+            $this->filterableInSearchAttributes = [];
+            $allSearchableAttributes = $this->getSearchableAttributes();
+            foreach ($allSearchableAttributes as $id => $attribute) {
+                if ($attribute->getData('is_filterable_in_search')) {
+                    $options = [];
+                    foreach ($attribute->getOptions() as $option) {
+                        $options[$option->getValue()] = $option->getLabel();
+                    }
+                    $this->filterableInSearchAttributes[$id] = $options;
+                }
+            }
+        }
+        return $this->filterableInSearchAttributes;
     }
 
     /**
@@ -849,7 +886,10 @@ class Full
         // category names
         $catNames = [];
         foreach ($product->getCategoryCollection()->addAttributeToSelect('name')->getItems() as $cat) {
-            $catNames[] = $cat['name'];
+            $catNames[] = array(
+                'id' => $cat['entity_id'],
+                'label' => $cat['name']
+            );
         }
         $index['category_names'] = $catNames;
 
